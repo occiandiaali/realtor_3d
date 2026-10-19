@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SplatSpace - 3D Room Studio</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --primary: #3b82f6;
+        --accent: #10b981;
+        --text: #f8fafc;
+      }
+      body {
+        margin: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      /* Navbar */
+      nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 32px;
+        background: #020617;
+        border-bottom: 1px solid #334155;
+      }
+      nav .brand {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: var(--primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      nav ul {
+        list-style: none;
+        display: flex;
+        gap: 24px;
+        margin: 0;
+        padding: 0;
+      }
+      nav a {
+        color: #94a3b8;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.2s;
+      }
+      nav a:hover {
+        color: var(--text);
+      }
+
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 32px 16px;
+      }
+
+      /* Scanner Section */
+      .scanner-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        border: 1px solid #334155;
+        margin-bottom: 48px;
+      }
+      .scanner-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+
+      #camera-wrapper {
+        position: relative;
+        width: 100%;
+        height: 420px;
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      /* Interactive Overlay Guide */
+      .overlay-guide {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: 2px dashed rgba(255, 255, 255, 0.3);
+        box-sizing: border-box;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 16px;
+      }
+      .status-badge {
+        align-self: center;
+        background: rgba(15, 23, 42, 0.85);
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        border: 1px solid #475569;
+        backdrop-filter: blur(4px);
+      }
+      .angle-tracker {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+      }
+      .angle-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+      }
+      .angle-dot.active {
+        background: var(--accent);
+        box-shadow: 0 0 8px var(--accent);
+      }
+
+      .controls {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+        align-items: center;
+      }
+      button {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.95rem;
+        transition: background 0.2s;
+      }
+      button:hover {
+        filter: brightness(1.1);
+      }
+      button:disabled {
+        background: #475569;
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+
+      #gallery {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        overflow-x: auto;
+        padding-bottom: 8px;
+      }
+      #gallery img {
+        width: 64px;
+        height: 64px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid #475569;
+      }
+
+      /* Past Rooms Grid */
+      .section-title {
+        font-size: 1.5rem;
+        margin-bottom: 20px;
+        color: var(--text);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 24px;
+      }
+      .room-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #334155;
+        transition: transform 0.2s;
+      }
+      .room-card:hover {
+        transform: translateY(-4px);
+      }
+      .room-card img {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+      }
+      .room-card .info {
+        padding: 16px;
+      }
+      .room-card h4 {
+        margin: 0 0 8px 0;
+        font-size: 1.1rem;
+      }
+      .room-card p {
+        margin: 0;
+        font-size: 0.85rem;
+        color: #94a3b8;
+      }
+
+      #htmx-target {
+        width: 100%;
+        height: 500px;
+        margin-top: 24px;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <div class="brand">📐 SplatSpace 3D</div>
+      <ul>
+        <li><a href="#">Studio</a></li>
+        <li><a href="#past-scans">Past Scans</a></li>
+        <li><a href="#">Settings</a></li>
+      </ul>
+    </nav>
+
+    <div class="container">
+      <div class="scanner-card">
+        <div class="scanner-header">
+          <h3>Capture Interior Room</h3>
+          <span
+            id="coverage-status"
+            style="color: #f59e0b; font-weight: 600; font-size: 0.9rem"
+            >Coverage: 0% (Min 8 shots)</span
+          >
+        </div>
+
+        <div id="camera-wrapper">
+          <video id="webcam" autoplay playsinline></video>
+          <div class="overlay-guide">
+            <div class="status-badge" id="guide-text">
+              Align camera & take overlapping photos around the room
+            </div>
+            <div class="angle-tracker" id="tracker-dots"></div>
+          </div>
+        </div>
+
+        <!-- HTMX Form Container -->
+        <form
+          id="upload-form"
+          hx-post="/process-room"
+          hx-target="#htmx-target"
+          hx-swap="innerHTML"
+          hx-encoding="multipart/form-data"
+          hx-indicator="#loading-indicator"
+        >
+          <!-- Hidden File Input that receives captured photos -->
+          <input
+            type="file"
+            id="photos-input"
+            name="photos"
+            multiple
+            style="display: none"
+          />
+
+          <div class="controls">
+            <button type="button" id="snap-btn" onclick="captureFrame()">
+              Take Photo (<span id="frame-count">0</span>)
+            </button>
+            <button type="submit" id="process-btn" disabled>
+              Generate 3D Room
+            </button>
+          </div>
+        </form>
+
+        <div id="gallery"></div>
+        <div
+          id="loading-indicator"
+          class="htmx-indicator"
+          style="
+            display: none;
+            margin-top: 12px;
+            color: var(--accent);
+            font-weight: 500;
+          "
+        >
+          ⏳ Reconstructing 3D spatial geometry... Please wait.
+        </div>
+
+        <div id="htmx-target"></div>
+      </div>
+
+      <!-- Past Rooms Grid Section -->
+      <h3 class="section-title" id="past-scans">Past 3D Scans</h3>
+      <div class="grid">
+        {% for scan in past_scans %}
+        <div class="room-card">
+          <img src="{{ scan.thumbnail }}" alt="{{ scan.title }}" />
+          <div class="info">
+            <h4>{{ scan.title }}</h4>
+            <p>Captured: {{ scan.date }} • {{ scan.frames }} Frames</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <script>
+      let video = document.getElementById("webcam");
+      let fileInput = document.getElementById("photos-input");
+      let dataTransfer = new DataTransfer(); // Holds File objects for <input type="file">
+
+      const MIN_REQUIRED_SHOTS = 8;
+      const RECOMMENDED_SHOTS = 12;
+
+      // Initialize 360-degree tracker dots
+      const trackerContainer = document.getElementById("tracker-dots");
+      for (let i = 0; i < RECOMMENDED_SHOTS; i++) {
+        let dot = document.createElement("div");
+        dot.className = "angle-dot";
+        dot.id = `dot-${i}`;
+        trackerContainer.appendChild(dot);
+      }
+
+      // Access Camera Feed
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "environment" } })
+        .then((stream) => {
+          video.srcObject = stream;
+        })
+        .catch((err) => console.error("Camera access error:", err));
+
+      function captureFrame() {
+        let canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        let ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob((blob) => {
+          let count = dataTransfer.files.length + 1;
+          let file = new File([blob], `frame_${count}.jpg`, {
+            type: "image/jpeg",
+          });
+
+          // Add file to DataTransfer object and sync with hidden file input
+          dataTransfer.items.add(file);
+          fileInput.files = dataTransfer.files;
+
+          // Gallery Preview
+          let img = document.createElement("img");
+          img.src = URL.createObjectURL(blob);
+          document.getElementById("gallery").appendChild(img);
+          document.getElementById("frame-count").innerText = count;
+
+          // Update Dot Trackers
+          if (count <= RECOMMENDED_SHOTS) {
+            document.getElementById(`dot-${count - 1}`).classList.add("active");
+          }
+
+          // Calculate Coverage & Feedback
+          let coveragePct = Math.min(
+            Math.round((count / MIN_REQUIRED_SHOTS) * 100),
+            100,
+          );
+          let statusText = document.getElementById("coverage-status");
+
+          if (count >= MIN_REQUIRED_SHOTS) {
+            statusText.innerText = `Coverage: ${coveragePct}% (Sufficient for 3D)`;
+            statusText.style.color = "#10b981";
+            document.getElementById("process-btn").disabled = false;
+            document.getElementById("guide-text").innerText =
+              "Coverage sufficient! You can capture more or generate the room now.";
+          } else {
+            statusText.innerText = `Coverage: ${coveragePct}% (Min ${MIN_REQUIRED_SHOTS} shots)`;
+            document.getElementById("guide-text").innerText =
+              `Frame ${count} saved. Pan 30° for next shot.`;
+          }
+        }, "image/jpeg");
+      }
+    </script>
+  </body>
+</html>
